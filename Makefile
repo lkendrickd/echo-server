@@ -1,3 +1,25 @@
+# Echo Server Makefile
+# -----------------------------------------------------
+# This Makefile contains targets for building, running,
+# and managing the Echo Server project. It simplifies
+# common tasks such as compiling the project, running
+# the server, and cleaning up build artifacts.
+#
+# Targets:
+#   - build: Compiles the Echo Server into a binary.
+#   - run: Starts the Echo Server locally.
+#   - run-binary: Builds and runs the compiled binary.
+#   - docker-build: Builds a Docker image for the server.
+#   - docker-run: Runs the Docker container.
+#   - clean: Removes any build artifacts.
+#
+# Usage:
+#   make <target>
+#
+# Example:
+#   make build
+# -----------------------------------------------------
+
 # Docker-related variables
 DOCKER_IMAGE_NAME=echo-server
 DOCKER_CONTAINER_NAME=echo-server-instance
