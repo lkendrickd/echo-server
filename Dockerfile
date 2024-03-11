@@ -1,19 +1,19 @@
-# Start from the official Go image to build your application
+# Builder Image
 FROM golang:1.22 AS builder
 
 # Create the directory to match the structure and set it as the working directory
 WORKDIR /opt/echo-server
 
-# Copy go.mod and go.sum files
+# Copy go.mod and go.sum files needed for dependancies
 COPY go.mod go.sum ./
 
-# Download all dependencies
+# Download all dependencies using the go mod tool
 RUN go mod download
 
 # Copy the entire project directory
 COPY . .
 
-# Change directory to where your main.go file is
+# Change directory to the binary directory
 WORKDIR /opt/echo-server/cmd
 
 # Build the Go app
@@ -40,4 +40,5 @@ ARG LOG_LEVEL
 ENV PORT=$PORT LOG_LEVEL=$LOG_LEVEL
 
 # Execute the binary directly, ensuring to respect the ENV variables for configuration.
+# Could also utilize a make target
 CMD ["sh", "-c", "./echo-server -port=${PORT} -logLevel=${LOG_LEVEL}"]
