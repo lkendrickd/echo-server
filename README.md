@@ -1,6 +1,6 @@
 ## Echo-Server
 
-![Echo Server](images/echo-server.webp)
+<img src="images/echo-server.webp" alt="Echo Server Logo" width="400"/>
 
 This is a simple echo server that utilizes the new features in Go 1.22.
 I wanted to showcase an example that now we do not need to use external libraries to handle the HTTP server and the routing.
