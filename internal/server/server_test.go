@@ -7,26 +7,31 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/lkendrickd/echo-server/internal/config"
 )
 
 func TestNewServer(t *testing.T) {
 	tests := []struct {
 		name             string
 		port             string
+		authEnabled      bool
 		wantReadTimeout  time.Duration
 		wantWriteTimeout time.Duration
 		wantIdleTimeout  time.Duration
 	}{
 		{
-			name:             "default port 8080",
+			name:             "default port 8080 without auth",
 			port:             ":8080",
+			authEnabled:      false,
 			wantReadTimeout:  15 * time.Second,
 			wantWriteTimeout: 15 * time.Second,
 			wantIdleTimeout:  60 * time.Second,
 		},
 		{
-			name:             "custom port 9090",
+			name:             "custom port 9090 with auth",
 			port:             ":9090",
+			authEnabled:      true,
 			wantReadTimeout:  15 * time.Second,
 			wantWriteTimeout: 15 * time.Second,
 			wantIdleTimeout:  60 * time.Second,
@@ -34,6 +39,7 @@ func TestNewServer(t *testing.T) {
 		{
 			name:             "port with host",
 			port:             "localhost:8081",
+			authEnabled:      false,
 			wantReadTimeout:  15 * time.Second,
 			wantWriteTimeout: 15 * time.Second,
 			wantIdleTimeout:  60 * time.Second,
@@ -44,8 +50,13 @@ func TestNewServer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 			mux := http.NewServeMux()
+			cfg := &config.Config{
+				Port:        tt.port,
+				LogLevel:    "info",
+				AuthEnabled: tt.authEnabled,
+			}
 
-			s := NewServer(logger, mux, tt.port)
+			s := NewServer(logger, mux, tt.port, cfg)
 
 			if s == nil {
 				t.Fatal("NewServer returned nil")
@@ -61,6 +72,10 @@ func TestNewServer(t *testing.T) {
 
 			if s.port != tt.port {
 				t.Errorf("port = %q, want %q", s.port, tt.port)
+			}
+
+			if s.config != cfg {
+				t.Error("config not set correctly")
 			}
 
 			if s.server == nil {
@@ -86,11 +101,28 @@ func TestNewServer(t *testing.T) {
 	}
 }
 
-func TestSetupRoutes(t *testing.T) {
+func TestNewServer_NilConfig(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	mux := http.NewServeMux()
 
-	s := NewServer(logger, mux, ":8080")
+	// Should not panic with nil config
+	s := NewServer(logger, mux, ":8080", nil)
+
+	if s == nil {
+		t.Fatal("NewServer returned nil")
+	}
+}
+
+func TestSetupRoutes(t *testing.T) {
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	mux := http.NewServeMux()
+	cfg := &config.Config{
+		Port:        ":8080",
+		LogLevel:    "info",
+		AuthEnabled: false,
+	}
+
+	s := NewServer(logger, mux, ":8080", cfg)
 	s.SetupRoutes()
 
 	tests := []struct {
@@ -136,8 +168,13 @@ func TestSetupRoutes(t *testing.T) {
 func TestSetupRoutes_MethodNotAllowed(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	mux := http.NewServeMux()
+	cfg := &config.Config{
+		Port:        ":8080",
+		LogLevel:    "info",
+		AuthEnabled: false,
+	}
 
-	s := NewServer(logger, mux, ":8080")
+	s := NewServer(logger, mux, ":8080", cfg)
 	s.SetupRoutes()
 
 	tests := []struct {
@@ -180,8 +217,13 @@ func TestSetupRoutes_MethodNotAllowed(t *testing.T) {
 func TestSetupRoutes_NotFound(t *testing.T) {
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	mux := http.NewServeMux()
+	cfg := &config.Config{
+		Port:        ":8080",
+		LogLevel:    "info",
+		AuthEnabled: false,
+	}
 
-	s := NewServer(logger, mux, ":8080")
+	s := NewServer(logger, mux, ":8080", cfg)
 	s.SetupRoutes()
 
 	tests := []struct {
