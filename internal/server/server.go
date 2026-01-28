@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/lkendrickd/echo-server/internal/handlers"
-	"github.com/lkendrickd/echo-server/internal/middleware"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,15 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lkendrickd/echo-server/internal/handlers"
+	"github.com/lkendrickd/echo-server/internal/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
-
-func init() {
-	// Register the prometheus metrics
-	prometheus.MustRegister(middleware.RequestDuration)
-	prometheus.MustRegister(middleware.EndpointCount)
-}
 
 // Server is the HTTP server
 type Server struct {
@@ -31,21 +25,39 @@ type Server struct {
 	port   string
 }
 
+// registerMetric safely registers a prometheus collector, ignoring AlreadyRegisteredError
+func registerMetric(c prometheus.Collector) {
+	if err := prometheus.DefaultRegisterer.Register(c); err != nil {
+		var alreadyRegistered prometheus.AlreadyRegisteredError
+		if !errors.As(err, &alreadyRegistered) {
+			panic(err)
+		}
+	}
+}
+
 // NewServer creates a new Server with middleware applied
 func NewServer(l *slog.Logger, mux *http.ServeMux, port string) *Server {
+	// Register prometheus metrics, tolerating duplicate registrations
+	registerMetric(middleware.RequestDuration)
+	registerMetric(middleware.EndpointCount)
+
 	// Wrap the existing muxer with the metricsMiddleware
 	wrappedMux := middleware.MetricsMiddleware(mux)
 
 	// Create a new http.Server using the wrapped muxer
 	server := &http.Server{
-		Addr:    port,
-		Handler: wrappedMux,
+		Addr:         port,
+		Handler:      wrappedMux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	return &Server{
 		logger: l,
 		muxer:  mux,
 		server: server,
+		port:   port,
 	}
 }
 
@@ -56,20 +68,20 @@ func (s *Server) Start() error {
 	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Add routes to the muxer
-	s.logger.Debug(`{"message": "setting up routes"}`)
+	s.logger.Debug("setting up routes")
 	s.SetupRoutes()
 
 	// Starting server in a goroutine
 	go func() {
-		s.logger.Log(context.Background(), slog.LevelInfo, `{"message": "starting server"}`)
+		s.logger.Info("starting server")
 		if err := s.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error(`{"message": "server failed to start", "error": %s}`, err.Error())
+			s.logger.Error("server failed to start", "error", err)
 		}
 	}()
 
 	// Block until a signal is received
 	<-stopChan
-	s.logger.Log(context.Background(), slog.LevelInfo, `{"message": "shutting down server"}`)
+	s.logger.Info("shutting down server")
 
 	// Create a deadline to wait for this is the duration the server will wait for existing connections to finish
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -77,10 +89,10 @@ func (s *Server) Start() error {
 
 	// Shutdown the server
 	if err := s.server.Shutdown(ctx); err != nil {
-		s.logger.Error(`{"message": "server shutdown failed", "error": ` + err.Error() + `}`)
+		s.logger.Error("server shutdown failed", "error", err)
 		return err
 	}
-	s.logger.Log(context.Background(), slog.LevelInfo, `{"message": "server exited properly"}`)
+	s.logger.Info("server exited properly")
 	return nil
 }
 

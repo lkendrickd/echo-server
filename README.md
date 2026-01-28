@@ -2,75 +2,98 @@
 
 <img src="images/echo-server.webp" alt="Echo Server Logo" width="400"/>
 
-This is a simple echo server that utilizes the new features in Go 1.22.
-I wanted to showcase an example that now we do not need to use external libraries to handle the HTTP server and the routing.
+A simple echo server showcasing Go's standard library HTTP server and routing capabilities without external frameworks.
 
-### Features:
+### Features
 
-- [x] HTTP Server
-- [x] Routing
-- [x] Middleware
-- [x] Structured Logging
-- [x] Prometheus Metrics
-- [x] Flag and Environment Variable Configuration
+- HTTP Server with production-ready timeouts
+- Routing using Go's native `http.ServeMux`
+- Metrics middleware with status code capture
+- Structured JSON logging via `slog`
+- Prometheus metrics with path, method, and status labels
+- Flag and environment variable configuration
+- Distroless Docker image for minimal attack surface
+- Unit tests for handlers, middleware, and server
 
-### Endpoints:
+### Endpoints
 
-- `GET /health`: Returns the health of the server
-- `POST api/v1/echo`: Returns the body of the request
-- `GET /metrics`: Returns the metrics of the server
+- `GET /health` - Returns server health status
+- `POST /api/v1/echo` - Returns the request body
+- `GET /metrics` - Returns Prometheus metrics
 
-### Usage:
-
-```bash
-go run cmd/echo-service.go
-```
-
-### Configuration:
-
-Note that environment variables for PORT and LOG_LEVEL take precedence over the flags.
-
-### Make Native Go Execution:
+### Quick Start
 
 ```bash
+# Show available make targets
+make
+
+# Build and run locally
 make build
 make run
+
+# Run with Docker
+make docker-run
+
+# Run tests
+make test
 ```
 
-#### Docker Execution:
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | Server port |
+| `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
+
+Environment variables take precedence over flags.
 
 ```bash
-make docker-run
+# Override defaults
+PORT=9090 LOG_LEVEL=debug make run
 ```
 
-#### Curl Examples:
+### Curl Examples
+
 Health Check:
 ```bash
 curl http://localhost:8080/health
 ```
+
 Echo:
 ```bash
 curl -X POST http://localhost:8080/api/v1/echo -d '{"message":"Hello World"}'
 ```
+
 Metrics:
 ```bash
 curl http://localhost:8080/metrics
 ```
 
-### Cleanup - When done with Docker Execution:
+### Docker
+
+The Docker image uses a multi-stage build with a distroless runtime image for security.
 
 ```bash
+# Build and run
+make docker-run
+
+# Cleanup
 make docker-clean
 ```
 
-### Expansion:
+### Project Structure
 
-To add on or remove an endpoint just manipulate this section under server/server.go
-
-```go
-func (s *Server) SetupRoutes() {}
+```
+.
+├── cmd/                      # Application entrypoint
+├── internal/
+│   ├── handlers/             # HTTP handlers
+│   ├── middleware/           # Metrics middleware
+│   └── server/               # Server setup and routing
+├── Dockerfile                # Multi-stage distroless build
+└── Makefile                  # Build and run targets
 ```
 
-Then add a handler for your route under handlers/handlers.go it's that simple.
+### Extending
 
-This is to show that frameworks really are unnecessary for microservices with the new features in Go 1.22.
+To add endpoints, modify `SetupRoutes()` in `internal/server/server.go` and add handlers in `internal/handlers/handlers.go`.
