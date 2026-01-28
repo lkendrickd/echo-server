@@ -5,21 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/lkendrickd/echo-server/internal/middleware"
 )
-
-func TestMain(m *testing.M) {
-	// Unregister any existing metrics before running tests
-	prometheus.Unregister(middleware.RequestDuration)
-	prometheus.Unregister(middleware.EndpointCount)
-	os.Exit(m.Run())
-}
 
 func TestNewServer(t *testing.T) {
 	tests := []struct {
@@ -54,10 +42,6 @@ func TestNewServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Unregister metrics to avoid duplicate registration
-			prometheus.Unregister(middleware.RequestDuration)
-			prometheus.Unregister(middleware.EndpointCount)
-
 			logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 			mux := http.NewServeMux()
 
@@ -103,10 +87,6 @@ func TestNewServer(t *testing.T) {
 }
 
 func TestSetupRoutes(t *testing.T) {
-	// Unregister metrics to avoid duplicate registration
-	prometheus.Unregister(middleware.RequestDuration)
-	prometheus.Unregister(middleware.EndpointCount)
-
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	mux := http.NewServeMux()
 
@@ -154,10 +134,6 @@ func TestSetupRoutes(t *testing.T) {
 }
 
 func TestSetupRoutes_MethodNotAllowed(t *testing.T) {
-	// Unregister metrics to avoid duplicate registration
-	prometheus.Unregister(middleware.RequestDuration)
-	prometheus.Unregister(middleware.EndpointCount)
-
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	mux := http.NewServeMux()
 
@@ -202,10 +178,6 @@ func TestSetupRoutes_MethodNotAllowed(t *testing.T) {
 }
 
 func TestSetupRoutes_NotFound(t *testing.T) {
-	// Unregister metrics to avoid duplicate registration
-	prometheus.Unregister(middleware.RequestDuration)
-	prometheus.Unregister(middleware.EndpointCount)
-
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	mux := http.NewServeMux()
 

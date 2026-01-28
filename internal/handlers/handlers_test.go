@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,13 +12,11 @@ import (
 
 func TestEchoHandler(t *testing.T) {
 	tests := []struct {
-		name           string
-		body           string
-		wantStatus     int
-		wantBody       string
-		wantContains   string
-		checkContains  bool
-		contentType    string
+		name        string
+		body        string
+		wantStatus  int
+		wantBody    string
+		contentType string
 	}{
 		{
 			name:        "valid JSON body",
@@ -67,14 +66,8 @@ func TestEchoHandler(t *testing.T) {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
 			}
 
-			if tt.checkContains {
-				if !strings.Contains(rec.Body.String(), tt.wantContains) {
-					t.Errorf("body = %q, want to contain %q", rec.Body.String(), tt.wantContains)
-				}
-			} else {
-				if rec.Body.String() != tt.wantBody {
-					t.Errorf("body = %q, want %q", rec.Body.String(), tt.wantBody)
-				}
+			if rec.Body.String() != tt.wantBody {
+				t.Errorf("body = %q, want %q", rec.Body.String(), tt.wantBody)
 			}
 
 			if ct := rec.Header().Get("Content-Type"); ct != tt.contentType {
@@ -101,8 +94,14 @@ func TestEchoHandler_ReadError(t *testing.T) {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 
-	if !strings.Contains(rec.Body.String(), "error") {
-		t.Errorf("body should contain error message, got %q", rec.Body.String())
+	// Verify response is valid JSON with error field
+	var errResp errorResponse
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Errorf("failed to decode error response: %v", err)
+	}
+
+	if errResp.Error == "" {
+		t.Error("expected non-empty error message")
 	}
 
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {

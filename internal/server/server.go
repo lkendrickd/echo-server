@@ -25,11 +25,21 @@ type Server struct {
 	port   string
 }
 
+// registerMetric safely registers a prometheus collector, ignoring AlreadyRegisteredError
+func registerMetric(c prometheus.Collector) {
+	if err := prometheus.DefaultRegisterer.Register(c); err != nil {
+		var alreadyRegistered prometheus.AlreadyRegisteredError
+		if !errors.As(err, &alreadyRegistered) {
+			panic(err)
+		}
+	}
+}
+
 // NewServer creates a new Server with middleware applied
 func NewServer(l *slog.Logger, mux *http.ServeMux, port string) *Server {
-	// Register prometheus metrics
-	prometheus.MustRegister(middleware.RequestDuration)
-	prometheus.MustRegister(middleware.EndpointCount)
+	// Register prometheus metrics, tolerating duplicate registrations
+	registerMetric(middleware.RequestDuration)
+	registerMetric(middleware.EndpointCount)
 
 	// Wrap the existing muxer with the metricsMiddleware
 	wrappedMux := middleware.MetricsMiddleware(mux)

@@ -8,12 +8,14 @@ import (
 
 func TestNewResponseWriter(t *testing.T) {
 	tests := []struct {
-		name               string
-		wantDefaultStatus  int
+		name              string
+		wantDefaultStatus int
+		wantWroteHeader   bool
 	}{
 		{
-			name:              "default status is 200",
+			name:              "default status is 200 and wroteHeader is false",
 			wantDefaultStatus: http.StatusOK,
+			wantWroteHeader:   false,
 		},
 	}
 
@@ -24,6 +26,10 @@ func TestNewResponseWriter(t *testing.T) {
 
 			if rw.statusCode != tt.wantDefaultStatus {
 				t.Errorf("statusCode = %d, want %d", rw.statusCode, tt.wantDefaultStatus)
+			}
+
+			if rw.wroteHeader != tt.wantWroteHeader {
+				t.Errorf("wroteHeader = %v, want %v", rw.wroteHeader, tt.wantWroteHeader)
 			}
 
 			if rw.ResponseWriter != rec {
@@ -75,6 +81,10 @@ func TestResponseWriter_WriteHeader(t *testing.T) {
 				t.Errorf("statusCode = %d, want %d", rw.statusCode, tt.statusCode)
 			}
 
+			if !rw.wroteHeader {
+				t.Error("wroteHeader should be true after WriteHeader")
+			}
+
 			if rec.Code != tt.statusCode {
 				t.Errorf("recorder Code = %d, want %d", rec.Code, tt.statusCode)
 			}
@@ -82,15 +92,32 @@ func TestResponseWriter_WriteHeader(t *testing.T) {
 	}
 }
 
+func TestResponseWriter_WriteHeader_OnlyFirstCall(t *testing.T) {
+	rec := httptest.NewRecorder()
+	rw := newResponseWriter(rec)
+
+	// First call should set status code
+	rw.WriteHeader(http.StatusCreated)
+	if rw.statusCode != http.StatusCreated {
+		t.Errorf("statusCode = %d, want %d", rw.statusCode, http.StatusCreated)
+	}
+
+	// Second call should not update the captured status code
+	rw.WriteHeader(http.StatusInternalServerError)
+	if rw.statusCode != http.StatusCreated {
+		t.Errorf("statusCode changed to %d, want %d (should not change)", rw.statusCode, http.StatusCreated)
+	}
+}
+
 func TestMetricsMiddleware(t *testing.T) {
 	tests := []struct {
-		name         string
-		method       string
-		path         string
+		name          string
+		method        string
+		path          string
 		handlerStatus int
-		handlerBody  string
-		wantStatus   int
-		wantBody     string
+		handlerBody   string
+		wantStatus    int
+		wantBody      string
 	}{
 		{
 			name:          "GET request returns 200",

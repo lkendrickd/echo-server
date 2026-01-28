@@ -25,6 +25,9 @@ PORT ?= 8080
 # Binary output name
 BINARY_NAME=echo-server
 
+# golangci-lint version (pinned for reproducibility)
+GOLANGCI_LINT_VERSION=v1.64.8
+
 ##@ General
 
 .PHONY: help
@@ -45,7 +48,7 @@ build: ## Build the application binary
 	go build -o ${BINARY_NAME} cmd/$(BINARY_NAME).go
 
 .PHONY: run
-run: ## Run the application locally
+run: build ## Build and run the application locally
 	./echo-server -port=${PORT} -logLevel=${LOG_LEVEL}
 
 .PHONY: test
@@ -58,7 +61,7 @@ test-verbose: ## Run unit tests with verbose output
 
 .PHONY: lint
 lint: ## Run golangci-lint (installs if not found)
-	@which golangci-lint > /dev/null 2>&1 || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
+	@which golangci-lint > /dev/null 2>&1 || (echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 	$(shell go env GOPATH)/bin/golangci-lint run ./...
 
 .PHONY: fmt

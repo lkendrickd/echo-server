@@ -1,9 +1,15 @@
 package handlers
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 )
+
+// errorResponse represents a JSON error response
+type errorResponse struct {
+	Error string `json:"error"`
+}
 
 // EchoHandler is the echo handler that returns the request body
 func EchoHandler(w http.ResponseWriter, r *http.Request) {
@@ -12,7 +18,7 @@ func EchoHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"error":"` + err.Error() + `"}`))
+		_ = json.NewEncoder(w).Encode(errorResponse{Error: err.Error()})
 		return
 	}
 

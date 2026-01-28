@@ -29,7 +29,8 @@ var (
 // responseWriter wraps http.ResponseWriter to capture the status code
 type responseWriter struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
 }
 
 // newResponseWriter creates a new responseWriter with default status 200
@@ -37,12 +38,16 @@ func newResponseWriter(w http.ResponseWriter) *responseWriter {
 	return &responseWriter{
 		ResponseWriter: w,
 		statusCode:     http.StatusOK,
+		wroteHeader:    false,
 	}
 }
 
-// WriteHeader captures the status code and calls the underlying WriteHeader
+// WriteHeader captures the status code on first call and delegates to underlying WriteHeader
 func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
+	if !rw.wroteHeader {
+		rw.statusCode = code
+		rw.wroteHeader = true
+	}
 	rw.ResponseWriter.WriteHeader(code)
 }
 
