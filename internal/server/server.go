@@ -11,11 +11,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lkendrickd/echo-server/internal/config"
 	"github.com/lkendrickd/echo-server/internal/handlers"
 	"github.com/lkendrickd/echo-server/internal/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// protectedPrefixes defines the URL prefixes that require authentication
+var protectedPrefixes = []string{"/api/"}
 
 // Server is the HTTP server
 type Server struct {
@@ -23,6 +27,7 @@ type Server struct {
 	muxer  *http.ServeMux
 	server *http.Server
 	port   string
+	config *config.Config
 }
 
 // registerMetric safely registers a prometheus collector, ignoring AlreadyRegisteredError
@@ -36,18 +41,24 @@ func registerMetric(c prometheus.Collector) {
 }
 
 // NewServer creates a new Server with middleware applied
-func NewServer(l *slog.Logger, mux *http.ServeMux, port string) *Server {
+func NewServer(l *slog.Logger, mux *http.ServeMux, port string, cfg *config.Config) *Server {
 	// Register prometheus metrics, tolerating duplicate registrations
 	registerMetric(middleware.RequestDuration)
 	registerMetric(middleware.EndpointCount)
 
-	// Wrap the existing muxer with the metricsMiddleware
-	wrappedMux := middleware.MetricsMiddleware(mux)
+	// Start with metrics middleware
+	var handler http.Handler = mux
+	handler = middleware.MetricsMiddleware(handler)
 
-	// Create a new http.Server using the wrapped muxer
+	// Apply auth middleware if enabled
+	if cfg != nil && cfg.AuthEnabled {
+		handler = middleware.AuthMiddleware(cfg, protectedPrefixes)(handler)
+	}
+
+	// Create a new http.Server using the wrapped handler
 	server := &http.Server{
 		Addr:         port,
-		Handler:      wrappedMux,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -58,6 +69,7 @@ func NewServer(l *slog.Logger, mux *http.ServeMux, port string) *Server {
 		muxer:  mux,
 		server: server,
 		port:   port,
+		config: cfg,
 	}
 }
 
@@ -73,7 +85,7 @@ func (s *Server) Start() error {
 
 	// Starting server in a goroutine
 	go func() {
-		s.logger.Info("starting server")
+		s.logger.Info("starting server", "port", s.port)
 		if err := s.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.logger.Error("server failed to start", "error", err)
 		}

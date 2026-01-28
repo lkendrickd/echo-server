@@ -1,45 +1,44 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/lkendrickd/echo-server/internal/config"
 	"github.com/lkendrickd/echo-server/internal/server"
-	"log/slog"
 )
 
 func main() {
-	// Define command-line flags
-	port := flag.String("port", "8080", "The port to listen on")
-	logLevel := flag.String("logLevel", "info", "The log level")
+	// Load configuration from environment variables
+	cfg := config.New()
 
-	// Parse command-line flags
-	flag.Parse()
-
-	// Check for environment variables and override flag values if necessary for port
-	if envPort, exists := os.LookupEnv("PORT"); exists {
-		*port = envPort
-	}
-
-	// Check for environment variables and override flag values if necessary for log level
-	if envLogLevel, exists := os.LookupEnv("LOG_LEVEL"); exists {
-		*logLevel = envLogLevel
-	}
-
-	// Set the log level based on the provided logLevel string
-	slogLevel := setLogLevel(*logLevel)
+	// Set the log level based on the config
+	slogLevel := setLogLevel(cfg.LogLevel)
 
 	// Initialize the logger with the determined log level
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel}))
+
+	// Log configuration (without sensitive data)
+	logger.Info("configuration loaded",
+		"port", cfg.Port,
+		"log_level", cfg.LogLevel,
+		"auth_enabled", cfg.AuthEnabled,
+		"api_key_count", cfg.APIKeyCount(),
+	)
+
+	// Warn if auth is enabled but no keys configured
+	if cfg.AuthEnabled && !cfg.HasAPIKeys() {
+		logger.Warn("authentication enabled but no API keys configured")
+	}
 
 	// Initialize the HTTP server mux
 	mux := http.NewServeMux()
 
 	// Create and start the server
-	s := server.NewServer(logger, mux, fmt.Sprintf(":%s", *port))
+	s := server.NewServer(logger, mux, fmt.Sprintf(":%s", cfg.Port), cfg)
 	if err := s.Start(); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

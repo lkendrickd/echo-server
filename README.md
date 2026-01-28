@@ -8,24 +8,32 @@ A simple echo server showcasing Go's standard library HTTP server and routing ca
 
 - HTTP Server with production-ready timeouts
 - Routing using Go's native `http.ServeMux`
+- API key authentication middleware
 - Metrics middleware with status code capture
 - Structured JSON logging via `slog`
 - Prometheus metrics with path, method, and status labels
-- Flag and environment variable configuration
+- 12-factor app configuration via environment variables
 - Distroless Docker image for minimal attack surface
-- Unit tests for handlers, middleware, and server
+- Comprehensive unit tests with table-driven patterns
 
 ### Endpoints
 
-- `GET /health` - Returns server health status
-- `POST /api/v1/echo` - Returns the request body
-- `GET /metrics` - Returns Prometheus metrics
+| Endpoint | Method | Auth Required | Description |
+|----------|--------|---------------|-------------|
+| `/health` | GET | No | Health check |
+| `/metrics` | GET | No | Prometheus metrics |
+| `/api/v1/echo` | POST | Yes* | Echo request body |
+
+*When `AUTH_ENABLED=true`
 
 ### Quick Start
 
 ```bash
 # Show available make targets
 make
+
+# Copy and configure environment
+cp example.env .env
 
 # Build and run locally
 make build
@@ -40,31 +48,59 @@ make test
 
 ### Configuration
 
+All configuration is via environment variables (12-factor app compliant).
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8080` | Server port |
 | `LOG_LEVEL` | `info` | Log level (debug, info, warn, error) |
-
-Environment variables take precedence over flags.
+| `AUTH_ENABLED` | `false` | Enable API key authentication |
+| `API_KEYS` | | Comma-separated list of valid API keys |
 
 ```bash
-# Override defaults
-PORT=9090 LOG_LEVEL=debug make run
+# Example: Run with authentication
+AUTH_ENABLED=true API_KEYS="key1,key2" make run
+```
+
+### Authentication
+
+When `AUTH_ENABLED=true`, protected endpoints (`/api/*`) require a valid API key in the `X-API-Key` header.
+
+```bash
+# Generate a secure API key
+openssl rand -hex 32
+
+# Request with API key
+curl -X POST http://localhost:8080/api/v1/echo \
+  -H "X-API-Key: your-api-key" \
+  -d '{"message":"Hello World"}'
+```
+
+Unauthenticated requests return `401 Unauthorized`:
+```json
+{"error":"missing API key"}
+```
+
+Invalid keys return:
+```json
+{"error":"invalid API key"}
 ```
 
 ### Curl Examples
 
-Health Check:
+Health Check (no auth required):
 ```bash
 curl http://localhost:8080/health
 ```
 
-Echo:
+Echo (with auth):
 ```bash
-curl -X POST http://localhost:8080/api/v1/echo -d '{"message":"Hello World"}'
+curl -X POST http://localhost:8080/api/v1/echo \
+  -H "X-API-Key: your-api-key" \
+  -d '{"message":"Hello World"}'
 ```
 
-Metrics:
+Metrics (no auth required):
 ```bash
 curl http://localhost:8080/metrics
 ```
@@ -77,6 +113,9 @@ The Docker image uses a multi-stage build with a distroless runtime image for se
 # Build and run
 make docker-run
 
+# Run with auth enabled
+AUTH_ENABLED=true API_KEYS="secret-key" make docker-run
+
 # Cleanup
 make docker-clean
 ```
@@ -87,13 +126,34 @@ make docker-clean
 .
 ├── cmd/                      # Application entrypoint
 ├── internal/
+│   ├── config/               # Environment configuration
 │   ├── handlers/             # HTTP handlers
-│   ├── middleware/           # Metrics middleware
+│   ├── middleware/           # Auth and metrics middleware
 │   └── server/               # Server setup and routing
+├── example.env               # Example environment file
 ├── Dockerfile                # Multi-stage distroless build
 └── Makefile                  # Build and run targets
 ```
 
+### Development
+
+```bash
+# Run tests
+make test
+
+# Run tests with coverage
+make coverage
+
+# Run linter
+make lint
+
+# Format code
+make fmt
+```
+
 ### Extending
 
-To add endpoints, modify `SetupRoutes()` in `internal/server/server.go` and add handlers in `internal/handlers/handlers.go`.
+To add endpoints:
+1. Add handler in `internal/handlers/handlers.go`
+2. Register route in `internal/server/server.go` `SetupRoutes()`
+3. Add tests in `internal/handlers/handlers_test.go`

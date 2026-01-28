@@ -9,6 +9,12 @@
 # Run 'make' or 'make help' to see available targets.
 # -----------------------------------------------------
 
+# Load .env file if it exists
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 # Default target
 .DEFAULT_GOAL := help
 
@@ -21,6 +27,12 @@ LOG_LEVEL ?= info
 
 # PORT can be set to any valid port number
 PORT ?= 8080
+
+# AUTH_ENABLED enables API key authentication
+AUTH_ENABLED ?= false
+
+# API_KEYS is a comma-separated list of valid API keys
+API_KEYS ?=
 
 # Binary output name
 BINARY_NAME=echo-server
@@ -40,6 +52,15 @@ help: ## Show this help message
 	@echo ""
 	@echo "Configuration (override with environment variables):"
 	@echo "  PORT=$(PORT)  LOG_LEVEL=$(LOG_LEVEL)"
+
+.PHONY: config
+config: ## Create .env from example.env if it doesn't exist
+	@if [ ! -f .env ]; then \
+		cp example.env .env; \
+		echo "Created .env from example.env"; \
+	else \
+		echo ".env already exists"; \
+	fi
 
 ##@ Development
 
@@ -88,7 +109,12 @@ docker-build: ## Build Docker image
 
 .PHONY: docker-run
 docker-run: docker-build ## Build and run Docker container
-	docker run -d --name $(DOCKER_CONTAINER_NAME) -p $(PORT):$(PORT) --env PORT=$(PORT) --env LOG_LEVEL=$(LOG_LEVEL) $(DOCKER_IMAGE_NAME)
+	docker run -d --name $(DOCKER_CONTAINER_NAME) -p $(PORT):$(PORT) \
+		--env PORT=$(PORT) \
+		--env LOG_LEVEL=$(LOG_LEVEL) \
+		--env AUTH_ENABLED=$(AUTH_ENABLED) \
+		--env API_KEYS=$(API_KEYS) \
+		$(DOCKER_IMAGE_NAME)
 
 .PHONY: docker-clean
 docker-clean: ## Stop and remove Docker container
